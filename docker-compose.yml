@@ -1,0 +1,13 @@
+version: "3"
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules  # prevent overwriting node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true  # ensures hot reload works inside Docker
