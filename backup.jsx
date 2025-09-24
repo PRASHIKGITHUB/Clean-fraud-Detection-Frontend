@@ -3,16 +3,6 @@ import React, { useEffect, useRef, useMemo, useState, useCallback } from "react"
 import { DataSet, Network } from "vis-network/standalone";
 import "vis-network/styles/vis-network.css";
 
-/**
- * Final ForceGraphVis (fetch-by-id)
- * - Renders only data fetched from `${BASE}/components/{id}`
- * - Expects response shape: { component: { nodes: [...], relationships: [...] } } or { components: [...] }
- * - Computes per-node averages from **relationship.props** numeric values (ignores missing keys)
- * - Node color is driven by degree (in+out) interpolated green -> red
- * - Tooltip shows: ID | Type | Rel-avg: X | RelCount: Y
- *
- * Usage: place this file in your React app. Update `BASE` constant if needed.
- */
 
 export default function ForceGraphVis({ height = 750 }) {
   const containerRef = useRef(null);
@@ -36,26 +26,11 @@ export default function ForceGraphVis({ height = 750 }) {
   const resolvedSource = fetchedResolved;
   const normalizedComponents = normalizeComponents(resolvedSource) || [];
 
-  // helpers for color interpolation and clamps
-  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
-  const hexToRgb = (hex) => {
-    const h = hex.replace("#", "");
-    const norm = h.length === 3 ? h.split("").map(s => s + s).join("") : h;
-    const bigint = parseInt(norm, 16);
-    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
-  };
-  const rgbToHex = (r, g, b) => {
-    const toHex = (c) => c.toString(16).padStart(2, "0");
-    return `#${toHex(Math.round(r))}${toHex(Math.round(g))}${toHex(Math.round(b))}`;
-  };
-  const lerp = (a, b, t) => a + (b - a) * t;
-
   const { visNodes, visEdges, groups } = useMemo(() => {
     const nodeMap = new Map();
     const edges = [];
     const palette = ["#4a90e2", "#50e3c2", "#f5a623", "#bd10e0", "#7ed321", "#b8e986"];
 
-    // Step 1: collect nodes and edges (keep raw rels on edges temporarily)
     normalizedComponents.forEach((comp, compIdx) => {
       (comp.nodes || []).forEach((n) => {
         if (!nodeMap.has(n.id)) {
@@ -63,10 +38,9 @@ export default function ForceGraphVis({ height = 750 }) {
           nodeMap.set(n.id, {
             id: n.id,
             label,
-            title: `ID: ${n.id} | Type: ${(n.labels || []).join(", ")}`,
+            title: `<div><strong>ID:</strong> ${n.id}<br/><strong>Labels:</strong> ${(n.labels||[]).join(", ")}<br/><strong>Props:</strong><pre style="white-space:pre-wrap">${JSON.stringify(n.props||{},null,2)}</pre></div>`,
             group: `g${compIdx}`,
             value: n.props?.weight ?? 1,
-            __labels: n.labels || [],
           });
         }
       });
@@ -79,98 +53,9 @@ export default function ForceGraphVis({ height = 750 }) {
           arrows: "to",
           label: r.type || "",
           font: { align: "top" },
-          __rawRel: r,
         });
       });
     });
-
-    // Step 2: adjacency counts map (nodeId -> Map(propKey -> count))
-    const adjacencyCountsMap = new Map();
-    for (const nid of nodeMap.keys()) adjacencyCountsMap.set(nid, new Map());
-
-    const extractNumericKeysFromRel = (rel) => {
-      const src = rel.props ?? rel.properties ?? rel;
-      const keys = [];
-      const ignore = new Set(["startId", "endId", "from", "to", "type", "id", "label"]);
-      for (const k of Object.keys(src || {})) {
-        if (ignore.has(k)) continue;
-        const v = src[k];
-        if (v == null) continue;
-        if (typeof v === "number" && Number.isFinite(v)) keys.push(k);
-        else if (typeof v === "string") {
-          const parsed = Number(v);
-          if (!Number.isNaN(parsed) && Number.isFinite(parsed)) keys.push(k);
-        }
-      }
-      return keys;
-    };
-
-    // Step 3: populate adjacency counts
-    edges.forEach((e) => {
-      const relObj = e.__rawRel || {};
-      const numericKeys = extractNumericKeysFromRel(relObj);
-      const fromMap = adjacencyCountsMap.get(e.from) || new Map();
-      const toMap = adjacencyCountsMap.get(e.to) || new Map();
-
-      numericKeys.forEach((k) => {
-        fromMap.set(k, (fromMap.get(k) || 0) + 1);
-        toMap.set(k, (toMap.get(k) || 0) + 1);
-      });
-
-      adjacencyCountsMap.set(e.from, fromMap);
-      adjacencyCountsMap.set(e.to, toMap);
-    });
-
-    // Step 4: degree map (unchanged)
-    const degreeMap = new Map();
-    for (const nodeId of nodeMap.keys()) degreeMap.set(nodeId, 0);
-    edges.forEach((e) => {
-      degreeMap.set(e.from, (degreeMap.get(e.from) || 0) + 1);
-      degreeMap.set(e.to, (degreeMap.get(e.to) || 0) + 1);
-    });
-
-    // Step 5: max degree for normalization
-    let maxDegree = 0;
-    for (const [, d] of degreeMap) if (d > maxDegree) maxDegree = d;
-    maxDegree = Math.max(maxDegree, 1);
-
-    // color ramp low->high
-    const lowHex = "#7ed321"; // green
-    const highHex = "#ff4444"; // red
-    const lowRgb = hexToRgb(lowHex);
-    const highRgb = hexToRgb(highHex);
-
-    // Step 6: finalize nodes: compute counts & set tooltip & color
-    for (const [id, nodeObj] of nodeMap) {
-      const countsMap = adjacencyCountsMap.get(id) || new Map();
-      // create a sorted array of 'key: count' strings for tooltip
-      const entries = Array.from(countsMap.entries()).sort((a, b) => b[1] - a[1]);
-      const countsText = entries.length ? entries.map(([k, v]) => `${k}: ${v}`).join(' | ') : 'No weights';
-
-      const totalCount = entries.reduce((s, [, v]) => s + v, 0);
-      const deg = degreeMap.get(id) || 0;
-      const t = clamp(deg / maxDegree, 0, 1);
-
-      const r = lerp(lowRgb[0], highRgb[0], t);
-      const g = lerp(lowRgb[1], highRgb[1], t);
-      const b = lerp(lowRgb[2], highRgb[2], t);
-      const bgHex = rgbToHex(r, g, b);
-      const darkenFactor = 0.78;
-      const borderHex = rgbToHex(r * darkenFactor, g * darkenFactor, b * darkenFactor);
-
-      nodeMap.set(id, {
-        ...nodeObj,
-        title: `ID: ${id} | Type: ${(nodeObj.__labels || []).join(", ") || "Unknown"} | Counts: ${countsText} | Total: ${totalCount}`,
-        color: {
-          background: bgHex,
-          border: borderHex,
-          highlight: {
-            background: bgHex,
-            border: "#222",
-          },
-        },
-      });
-    }
 
     const groups = {};
     normalizedComponents.forEach((_, i) => {
@@ -180,8 +65,7 @@ export default function ForceGraphVis({ height = 750 }) {
       };
     });
 
-    const visEdgesClean = edges.map(({ __rawRel, ...rest }) => rest);
-    return { visNodes: Array.from(nodeMap.values()), visEdges: visEdgesClean, groups };
+    return { visNodes: Array.from(nodeMap.values()), visEdges: edges, groups };
   }, [normalizedComponents]);
 
   // Fetch function
@@ -192,9 +76,8 @@ export default function ForceGraphVis({ height = 750 }) {
       return;
     }
 
-    // update BASE if needed
-    const BASE = "http://172.31.186.176:8080";
-    const baseClean = BASE.replace(/\/$/, "");
+    const base = "http://10.8.12.212:8080";
+    const baseClean = base.replace(/\/$/, "");
     const url = `${baseClean}/components/${encodeURIComponent(id)}`;
 
     setLoading(true);
@@ -202,10 +85,9 @@ export default function ForceGraphVis({ height = 750 }) {
       const res = await fetch(url, { signal });
       if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
       const json = await res.json();
-      // helpful logs during development
-      // console.log('raw json', json);
-      // console.log('normalized', normalizeComponents(json));
-      setFetchedResolved(json);
+      console.log(json);
+      console.log(normalizeComponents(json));
+      setFetchedResolved(json)
       setError(null);
     } catch (err) {
       if (err.name === 'AbortError') return; // ignore abort
@@ -278,7 +160,8 @@ export default function ForceGraphVis({ height = 750 }) {
   // Handlers
   const handleInputChange = (e) => {
     e.stopPropagation();
-    setIdInput(e.target.value);
+    const value = e.target.value;
+    setIdInput(value);
   };
 
   const handleFetchClick = async () => {
@@ -292,6 +175,14 @@ export default function ForceGraphVis({ height = 750 }) {
       e.preventDefault();
       handleFetchClick();
     }
+  };
+
+  const handleInputKeyPress = (e) => {
+    e.stopPropagation();
+  };
+
+  const handleInputFocus = (e) => {
+    e.stopPropagation();
   };
 
   // Button styles (simple, modern)
@@ -322,6 +213,8 @@ export default function ForceGraphVis({ height = 750 }) {
           type="text"
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          onKeyPress={handleInputKeyPress}
+          onFocus={handleInputFocus}
           onMouseDown={(e) => e.stopPropagation()}
           onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}

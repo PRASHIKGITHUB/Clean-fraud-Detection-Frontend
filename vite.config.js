@@ -11,4 +11,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server:{
+    host: true,
+    allowedOrigins: ['http://localhost:3000', 'http://172.31.186.176:5173', 'http://172.31.186.107:5173']
+  }
 })
