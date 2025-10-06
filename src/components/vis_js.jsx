@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useMemo, useState, useCallback } from "react"
 import { DataSet, Network } from "vis-network/standalone";
 import "vis-network/styles/vis-network.css";
 
-const BASE = "http://172.31.186.176:8080"; // change if needed
+const BASE = "http://host.docker.internal:8080"; // change if needed
 
 const MATCH_PROPS = [
   "face_score",
