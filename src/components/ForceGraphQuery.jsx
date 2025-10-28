@@ -2,18 +2,49 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { DataSet, Network } from "vis-network/standalone";
 import "vis-network/styles/vis-network.css";
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
-/**
- * Props:
- *  - base (string) : base url of API
- *  - endpoint (string) : path to query
- *  - height (number|string) : graph container height
- */
 export default function ForceGraphQuery({
-  base = "http://localhost:8080",
-  endpoint = "/refsimilar",
+  base ,
+  endpoint,
   height = 720,
 }) {
+
+  const labelIconMap = {
+    UID: {
+      code: '\uf2bb', // fingerprint icon for a unique identifier
+      color: '#3498db',
+    },
+
+    Person: {
+      code: '\uf0ec', // exchange/transfer icon
+      color: '#f39c12',
+    },
+
+    Operator : {
+      code: '\uf007', // standard user icon
+      color: '#27ae60',
+    },
+    Location: {
+      code: '\uf3c5', // location-dot icon for a specific point on a map
+      color: '#e74c3c',
+    },
+    Machine: {
+      code: '\ue4e5', // computer icon (Pro plan required for this specific code)
+      // A good free alternative might be: '\uf109' (laptop) or '\uf233' (server)
+      color: '#34495e',
+    },
+    Device: {
+      code: '\uf10b', // mobile phone icon, a general device icon
+      // A good alternative is '\uf109' (laptop)
+      color: '#f1c40f',
+    },
+    Station: {
+      code: '\uf5e7', // charging-station icon
+      // A good alternative is '\uf238' (train) for a transport station
+      color: '#95a5a6',
+    },
+  };
   const containerRef = useRef(null);
   const networkRef = useRef(null);
 
@@ -125,49 +156,102 @@ export default function ForceGraphQuery({
     // build positioned node map while skipping removed nodes
     const positioned = new Map();
 
-    // Operators: vertical line at left X
-    const filteredOps = ops.filter((n) => !removedNodeIds.has(n.id));
-    filteredOps.forEach((node, idx) => {
-      positioned.set(node.id, {
-        id: node.id,
-        label: node.id,
-        title: `ID: ${node.id}\nLabels: ${node.labels.join(", ")}`,
-        x: layerX.left,
-        y: idx * spacingY - ((filteredOps.length - 1) * spacingY) / 2,
-        shape: "dot",
-        value: 24,
-        group: "operator",
-      });
-    });
 
-    // UIDs: place slightly right to operators but still in same left-layer band
-    const filteredUids = uids.filter((n) => !removedNodeIds.has(n.id));
-    filteredUids.forEach((node, idx) => {
-      positioned.set(node.id, {
-        id: node.id,
-        label: node.id,
-        title: `ID: ${node.id}\nLabels: ${node.labels.join(", ")}`,
-        x: layerX.left + 120,
-        y: idx * spacingY - ((filteredUids.length - 1) * spacingY) / 2,
-        shape: "dot",
-        value: 20,
-        group: "uid",
-      });
-    });
+const filteredOps = ops.filter((n) => !removedNodeIds.has(n.id));
+filteredOps.forEach((node, idx) => {
+  // Check if the node has an "Operator" label
+  const isOperator = node.labels.includes("Operator");
+  const iconDetails = labelIconMap.Operator;
 
-    // Persons: center column (do not remove persons)
-    persons.forEach((node, idx) => {
-      positioned.set(node.id, {
-        id: node.id,
-        label: node.id,
-        title: `ID: ${node.id}\nLabels: ${node.labels.join(", ")}`,
-        x: layerX.center,
-        y: idx * spacingY - ((persons.length - 1) * spacingY) / 2,
-        shape: "dot",
-        value: 22,
-        group: "person",
-      });
-    });
+  const nodeProps = {
+    id: node.id,
+    label: node.id,
+    title: `ID: ${node.id}\nLabels: ${node.labels.join(", ")}`,
+    x: layerX.left,
+    y: idx * spacingY - ((filteredOps.length - 1) * spacingY) / 2,
+    value: 24,
+    group: "operator", // Still useful for styling or physics groups
+  };
+
+  if (isOperator && iconDetails) {
+    // If it is an operator, add the icon properties
+    nodeProps.shape = "icon";
+    nodeProps.icon = {
+      face: "FontAwesome",
+      code: iconDetails.code,
+      color: iconDetails.color,
+      size: 30, // Adjust size as needed
+    };
+  } else {
+    // Otherwise, use a default shape, for example
+    nodeProps.shape = "dot";
+  }
+
+  positioned.set(node.id, nodeProps);
+});
+
+
+// UIDs: place slightly right to operators but still in same left-layer band
+const filteredUids = uids.filter((n) => !removedNodeIds.has(n.id));
+filteredUids.forEach((node, idx) => {
+  const isUid = node.labels.includes("UID");
+  const iconDetails = labelIconMap.UID;
+
+  const nodeProps = {
+    id: node.id,
+    label: node.id,
+    title: `ID: ${node.id}\nLabels: ${node.labels.join(", ")}`,
+    x: layerX.left + 120,
+    y: idx * spacingY - ((filteredUids.length - 1) * spacingY) / 2,
+    value: 20,
+    group: "uid",
+  };
+
+  if (isUid && iconDetails) {
+    nodeProps.shape = "icon";
+    nodeProps.icon = {
+      face: "FontAwesome",
+      code: iconDetails.code,
+      color: iconDetails.color,
+      size: 30,
+    };
+  } else {
+    nodeProps.shape = "dot";
+  }
+
+  positioned.set(node.id, nodeProps);
+});
+
+// Persons: center column (do not remove persons)
+persons.forEach((node, idx) => {
+  const isPerson = node.labels.includes("Person");
+  const iconDetails = labelIconMap.Person;
+
+  const nodeProps = {
+    id: node.id,
+    label: node.id,
+    title: `ID: ${node.id}\nLabels: Refid`,
+    x: layerX.center,
+    y: idx * spacingY - ((persons.length - 1) * spacingY) / 2,
+    value: 22,
+    group: "person",
+  };
+
+  if (isPerson && iconDetails) {
+    nodeProps.shape = "icon";
+    nodeProps.icon = {
+      face: "FontAwesome",
+      code: iconDetails.code,
+      color: iconDetails.color,
+      size: 30,
+    };
+  } else {
+    nodeProps.shape = "dot";
+  }
+
+  positioned.set(node.id, nodeProps);
+});
+
 
     // Others: right column (do not remove)
     others.forEach((node, idx) => {
@@ -250,7 +334,7 @@ export default function ForceGraphQuery({
       if (params.nodes && params.nodes.length) {
         const nid = params.nodes[0];
         const n = nodesDS.get(nid);
-        setSelectedNode({ id: nid, labels: (n.group ? [n.group] : []) });
+        setSelectedNode({ id: nid, labels: (n.group ? (n.group=='person'?['Refid']:[n.group]) : []) });
       } else {
         setSelectedNode(null);
       }

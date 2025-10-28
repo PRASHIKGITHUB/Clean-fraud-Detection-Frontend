@@ -4,49 +4,53 @@ import { Toaster } from "sonner";
 import ForceGraphQuery from "./components/ForceGraphQuery";
 import SusNodes from "./components/SusNodes";
 import UIDOperatorGraph from "./components/OperatorGraph";
+import OffTime from "./components/OffTime";
 
 export default function App() {
-  // "force" = ForceGraphQuery (default), "sus" = SusNodes, "both" = show both
+
   const [activePanel, setActivePanel] = useState("force");
+  // Constants
+  const base_url = "http://localhost:8080"
+  const endpoints = {
+    "susnode" : "/compdegree",
+    "forcegraph" : "/refsimilar",
+    "uidoperator": "/sameop",
+    "offtime": "/offtime"
+  }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="px-6 space-y-6">
       <Toaster richColors closeButton />
 
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Graph View</h1>
-          <p className="text-sm text-gray-600">Inspect component relationships and suspicious nodes.</p>
-        </div>
 
         <div className="flex gap-2">
           <button
             onClick={() => setActivePanel("force")}
-            className={`px-3 py-2 rounded-md font-medium transition ${activePanel === "force" ? "bg-amber-500 text-white" : "bg-white border border-gray-200"}`}
+            className={`px-2 py-1 rounded-md text-sm transition ${activePanel === "force" ? "bg-black text-white" : "bg-white border border-gray-200"}`}
           >
-            ForceGraph
+            Get Component
           </button>
 
           <button
             onClick={() => setActivePanel("sus")}
-            className={`px-3 py-2 rounded-md font-medium transition ${activePanel === "sus" ? "bg-amber-500 text-white" : "bg-white border border-gray-200"}`}
+            className={`px-2 py-1 rounded-md text-sm transition ${activePanel === "sus" ? "bg-black text-white" : "bg-white border border-gray-200"}`}
           >
-            SusNodes
+            Suspicious Nodes
           </button>
 
           <button
             onClick={() => setActivePanel("op")}
-            className={`px-3 py-2 rounded-md font-medium transition ${activePanel === "op" ? "bg-amber-500 text-white" : "bg-white border border-gray-200"}`}
+            className={`px-2 py-1 rounded-md text-sm transition ${activePanel === "op" ? "bg-black text-white" : "bg-white border border-gray-200"}`}
           >
-            Operator Pakda Gaya
+            Operator Activity
           </button>
 
-
           <button
-            onClick={() => setActivePanel("both")}
-            className={`px-3 py-2 rounded-md font-medium transition ${activePanel === "both" ? "bg-amber-500 text-white" : "bg-white border border-gray-200"}`}
+            onClick={() => setActivePanel("offtime")}
+            className={`px-2 py-1 rounded-md text-sm transition ${activePanel === "offtime" ? "bg-black text-white" : "bg-white border border-gray-200"}`}
           >
-            Both
+            Off Time Activity
           </button>
         </div>
       </div>
@@ -54,28 +58,34 @@ export default function App() {
       <div>
         {activePanel === "force" && (
           <div>
-            <ForceGraphQuery />
+            <ForceGraphQuery base={base_url} endpoint={endpoints.forcegraph}/>
           </div>
         )}
 
         {activePanel === "sus" && (
           <div>
-            <SusNodes />
+            <SusNodes base={base_url} endpoint={endpoints.susnode}/>
           </div>
         )}
 
         {activePanel === "op" && (
           <div>
-            <UIDOperatorGraph />
+            <UIDOperatorGraph base={base_url} endpoint={endpoints.uidoperator}/>
           </div>
         )}
 
         {activePanel === "both" && (
           <div className="space-y-6">
-            <ForceGraphQuery />
-            <SusNodes />
+            <ForceGraphQuery base={base_url} endpoint={endpoints.forcegraph}/>
           </div>
         )}
+
+        {activePanel === "offtime" && (
+          <div className="space-y-6">
+            <OffTime base={base_url} endpoint={endpoints.offtime}/>
+          </div>
+        )}
+
       </div>
     </div>
   );

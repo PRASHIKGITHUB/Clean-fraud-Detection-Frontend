@@ -3,15 +3,9 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { DataSet, Network } from "vis-network/standalone";
 import "vis-network/styles/vis-network.css";
 
-/**
- * Props:
- *  - base (string) : base url of API
- *  - endpoint (string) : endpoint path (default "/uidoperatorchains")
- *  - height (number|string) : graph container height
- */
 export default function UIDOperatorGraph({
-  base = "http://localhost:8080",
-  endpoint = "/sameop",
+  base,
+  endpoint,
   height = 720,
 }) {
   const containerRef = useRef(null);
@@ -36,6 +30,7 @@ export default function UIDOperatorGraph({
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
       const json = await res.json();
+      console.log(json)
 
       // defensive parsing
       const nodes = Array.isArray(json.nodes) ? json.nodes : [];
@@ -98,7 +93,7 @@ export default function UIDOperatorGraph({
         x: layerX.left,
         y: idx * spacingY - ((operators.length - 1) * spacingY) / 2,
         shape: "dot",
-        value: 26,
+        value: 24,
         group: "operator",
       });
     });
@@ -112,7 +107,7 @@ export default function UIDOperatorGraph({
         x: layerX.left2,
         y: idx * spacingY - ((uids.length - 1) * spacingY) / 2,
         shape: "dot",
-        value: 22,
+        value: 24,
         group: "uid",
       });
     });
@@ -175,7 +170,7 @@ export default function UIDOperatorGraph({
       interaction: { hover: true, tooltipDelay: 100, navigationButtons: true, dragNodes: true },
       groups: {
         operator: { color: { background: "#ffd1a4", border: "#c06" } },
-        uid: { color: { background: "#cfe9ff", border: "#06c" } },
+        uid: { color: { background: "#831fd4ff", border: "#06c" } },
         person: { color: { background: "#e6ffe6", border: "#0a0" } },
         other: { color: { background: "#eee", border: "#777" } },
       },
@@ -306,3 +301,4 @@ export default function UIDOperatorGraph({
     </div>
   );
 }
+
