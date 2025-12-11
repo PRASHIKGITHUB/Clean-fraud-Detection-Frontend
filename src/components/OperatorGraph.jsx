@@ -7,6 +7,7 @@ export default function UIDOperatorGraph({
   base,
   endpoint,
   height = 720,
+  apiNodes,setApiNodes,apiRels,setApiRels
 }) {
   const containerRef = useRef(null);
   const networkRef = useRef(null);
@@ -15,8 +16,8 @@ export default function UIDOperatorGraph({
   const [error, setError] = useState(null);
 
   // raw api result arrays
-  const [apiNodes, setApiNodes] = useState([]); // [{ node_id, labels }]
-  const [apiRels, setApiRels] = useState([]); // [{ start_node_id, end_node_id, type }]
+  // const [apiNodes, setApiNodes] = useState([]); // [{ node_id, labels }]
+  // const [apiRels, setApiRels] = useState([]); // [{ start_node_id, end_node_id, type }]
 
   // UI state
   const [previewCounts, setPreviewCounts] = useState({ nodes: 0, edges: 0 });
@@ -55,9 +56,9 @@ export default function UIDOperatorGraph({
   }, [base, endpoint]);
 
   // initial fetch on mount
-  useEffect(() => {
-    fetchGraph();
-  }, [fetchGraph]);
+  // useEffect(() => {
+  //   fetchGraph();
+  // }, [fetchGraph]);
 
   // build and render graph when apiNodes/apiRels change
   useEffect(() => {
@@ -93,7 +94,7 @@ export default function UIDOperatorGraph({
         x: layerX.left,
         y: idx * spacingY - ((operators.length - 1) * spacingY) / 2,
         shape: "dot",
-        value: 24,
+        value: 22,
         group: "operator",
       });
     });
@@ -107,7 +108,7 @@ export default function UIDOperatorGraph({
         x: layerX.left2,
         y: idx * spacingY - ((uids.length - 1) * spacingY) / 2,
         shape: "dot",
-        value: 24,
+        value: 22,
         group: "uid",
       });
     });
@@ -121,7 +122,7 @@ export default function UIDOperatorGraph({
         x: layerX.center,
         y: idx * spacingY - ((persons.length - 1) * spacingY) / 2,
         shape: "dot",
-        value: 24,
+        value: 22,
         group: "person",
       });
     });
@@ -135,7 +136,7 @@ export default function UIDOperatorGraph({
         x: layerX.right,
         y: idx * spacingY - ((others.length - 1) * spacingY) / 2,
         shape: "dot",
-        value: 18,
+        value: 22,
         group: "other",
       });
     });

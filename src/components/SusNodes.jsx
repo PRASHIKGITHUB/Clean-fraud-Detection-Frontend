@@ -25,9 +25,9 @@ const toastDiv = {
   zIndex: 1000,
 };
 
-export default function CompDegreeTable({ base, endpoint}) {
+export default function CompDegreeTable({ base, endpoint,data,setData}) {
   const [min, setMin] = useState(4);
-  const [data, setData] = useState([]);
+  // const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -74,9 +74,9 @@ export default function CompDegreeTable({ base, endpoint}) {
     }
   };
 
-  useEffect(() => {
-    fetchData(min);
-  }, [base, endpoint]);
+  // useEffect(() => {
+  //   fetchData(min);
+  // }, [base, endpoint]);
 
   const processed = useMemo(() => {
     let arr = Array.isArray(data) ? data.slice() : [];

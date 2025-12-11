@@ -5,7 +5,7 @@ import "vis-network/styles/vis-network.css";
 export default function OffTime({
   base,
   endpoint,
-  height = 720,
+  height = 720,apiNodes, setApiNodes,apiRels, setApiRels
 }) {
   const containerRef = useRef(null);
   const networkRef = useRef(null);
@@ -14,8 +14,8 @@ export default function OffTime({
   const [error, setError] = useState(null);
 
   // raw api result arrays
-  const [apiNodes, setApiNodes] = useState([]);
-  const [apiRels, setApiRels] = useState([]);
+  // const [apiNodes, setApiNodes] = useState([]);
+  // const [apiRels, setApiRels] = useState([]);
 
   // UI state
   const [previewCounts, setPreviewCounts] = useState({ nodes: 0, edges: 0 });
@@ -68,9 +68,9 @@ export default function OffTime({
   }, [base, endpoint, degree]);
 
   // fetch on mount and whenever degree changes
-  useEffect(() => {
-    fetchGraph();
-  }, []);
+  // useEffect(() => {
+  //   fetchGraph();
+  // }, []);
 
   // build graph when nodes/rels change
   useEffect(() => {

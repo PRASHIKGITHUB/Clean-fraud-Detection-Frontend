@@ -2,65 +2,39 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { DataSet, Network } from "vis-network/standalone";
 import "vis-network/styles/vis-network.css";
-import '@fortawesome/fontawesome-free/css/all.min.css';
 
 export default function ForceGraphQuery({
-  base ,
-  endpoint,
+  base,
+  endpoint1,
+  endpoint2,
   height = 720,
 }) {
-
-  const labelIconMap = {
-    UID: {
-      code: '\uf2bb', // fingerprint icon for a unique identifier
-      color: '#3498db',
-    },
-
-    Person: {
-      code: '\uf0ec', // exchange/transfer icon
-      color: '#f39c12',
-    },
-
-    Operator : {
-      code: '\uf007', // standard user icon
-      color: '#27ae60',
-    },
-    Location: {
-      code: '\uf3c5', // location-dot icon for a specific point on a map
-      color: '#e74c3c',
-    },
-    Machine: {
-      code: '\ue4e5', // computer icon (Pro plan required for this specific code)
-      // A good free alternative might be: '\uf109' (laptop) or '\uf233' (server)
-      color: '#34495e',
-    },
-    Device: {
-      code: '\uf10b', // mobile phone icon, a general device icon
-      // A good alternative is '\uf109' (laptop)
-      color: '#f1c40f',
-    },
-    Station: {
-      code: '\uf5e7', // charging-station icon
-      // A good alternative is '\uf238' (train) for a transport station
-      color: '#95a5a6',
-    },
+  // Simple color palette by label type
+  const labelColorMap = {
+    UID: "#3498db",
+    Refid: "#f39c12",
+    Operator: "#27ae60",
+    Location: "#e74c3c",
+    Machine: "#34495e",
+    Device: "#f1c40f",
+    Station: "#95a5a6",
+    default: "#999",
   };
+
   const containerRef = useRef(null);
   const networkRef = useRef(null);
 
+  const [currId, setcurrId] = useState("communityid");
   const [refid, setRefid] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const [nodes, setNodes] = useState([]); // expected: [{ node_id, labels }]
-  const [relationships, setRelationships] = useState([]); // expected: [{ start_node_id, end_node_id, type }]
-
+  const [nodes, setNodes] = useState([]);
+  const [relationships, setRelationships] = useState([]);
   const [previewCounts, setPreviewCounts] = useState({ nodes: 0, edges: 0 });
-  const [selectedNode, setSelectedNode] = useState(null); // { id, labels }
-
-  // NEW: magic filter flag
+  const [selectedNode, setSelectedNode] = useState(null);
   const [magicFilter, setMagicFilter] = useState(false);
 
+  // Fetch data
   const fetchGraph = useCallback(
     async (id) => {
       setError(null);
@@ -73,22 +47,39 @@ export default function ForceGraphQuery({
           return;
         }
         const baseClean = base.replace(/\/$/, "");
-        const url = `${baseClean}${endpoint}?refid=${encodeURIComponent(id)}`;
+        let url =
+          currId === "refid"
+            ? `${baseClean}${endpoint1}?refid=${encodeURIComponent(id)}`
+            : `${baseClean}${endpoint2}?id=${encodeURIComponent(id)}`;
+
         const res = await fetch(url);
-        if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.statusText}`);
+        if (!res.ok)
+          throw new Error(`Request failed: ${res.status} ${res.statusText}`);
         const json = await res.json();
 
-        const apiNodes = Array.isArray(json.nodes) ? json.nodes : Array.isArray(json.incoming) ? json.incoming : [];
-        const apiRels = Array.isArray(json.relationships) ? json.relationships : [];
+        const apiNodes = Array.isArray(json.nodes)
+          ? json.nodes
+          : Array.isArray(json.incoming)
+          ? json.incoming
+          : [];
+        const apiRels = Array.isArray(json.relationships)
+          ? json.relationships
+          : [];
 
-        setNodes(apiNodes.map((n) => ({ node_id: n.node_id ?? n.id ?? n.props?.id ?? n.id, labels: n.labels ?? [] })));
+        setNodes(
+          apiNodes.map((n) => ({
+            node_id: n.node_id ?? n.id ?? n.props?.id ?? n.id,
+            labels: n.labels ?? [],
+          }))
+        );
         setRelationships(
           apiRels.map((r, i) => ({
-            id: r.id ?? `r-${i}-${r.start_node_id ?? r.from}-${r.end_node_id ?? r.to}`,
-            start: r.start_node_id ?? r.from,
-            end: r.end_node_id ?? r.to,
+            id:
+              r.id ??
+              `r-${i}-${r.start_node_id ?? r.from}-${r.end_node_id ?? r.to}`,
+            start: r.start_node_id ?? r.from ?? r.start_id,
+            end: r.end_node_id ?? r.to ?? r.end_id,
             type: r.type ?? r.label ?? "",
-            raw: r,
           }))
         );
       } catch (err) {
@@ -100,17 +91,15 @@ export default function ForceGraphQuery({
         setLoading(false);
       }
     },
-    [base, endpoint]
+    [base, endpoint1, endpoint2, currId]
   );
 
-  // toggle magic filter
   const toggleMagic = () => setMagicFilter((s) => !s);
 
-  // Build vis nodes/edges, compute layered positions and mount network whenever nodes/relationships or magicFilter change
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // first, create a simple degree map from relationships (counts occurrences as start or end)
+    // Compute degree map for magic filter
     const degMap = new Map();
     for (const r of relationships) {
       const s = String(r.start);
@@ -119,162 +108,47 @@ export default function ForceGraphQuery({
       degMap.set(e, (degMap.get(e) || 0) + 1);
     }
 
-    // categorize nodes into groups (but apply magic filter later)
-    const ops = [];
-    const uids = [];
-    const persons = [];
-    const others = [];
-
-    for (const n of nodes) {
-      const id = String(n.node_id);
-      const labelsLower = (n.labels || []).map((l) => (l || "").toString().toLowerCase());
-      if (labelsLower.some((l) => l.includes("operator"))) ops.push({ id, labels: n.labels });
-      else if (labelsLower.some((l) => l.includes("uid"))) uids.push({ id, labels: n.labels });
-      else if (labelsLower.some((l) => l.includes("person"))) persons.push({ id, labels: n.labels });
-      else others.push({ id, labels: n.labels });
-    }
-
-    // If magicFilter is enabled, remove UID/Operator nodes that have exactly 1 relation
-    const removedNodeIds = new Set();
+    // Filter nodes based on magic filter
+    let filteredNodes = nodes;
     if (magicFilter) {
-      for (const op of ops) {
-        if ((degMap.get(op.id) || 0) === 1) removedNodeIds.add(op.id);
+      const toRemove = new Set();
+      for (const n of nodes) {
+        const degree = degMap.get(String(n.node_id)) || 0;
+        const labels = (n.labels || []).map((l) => l.toLowerCase());
+        if (
+          degree === 1 &&
+          (labels.includes("operator") || labels.includes("uid"))
+        ) {
+          toRemove.add(String(n.node_id));
+        }
       }
-      for (const u of uids) {
-        if ((degMap.get(u.id) || 0) === 1) removedNodeIds.add(u.id);
-      }
+      filteredNodes = nodes.filter((n) => !toRemove.has(String(n.node_id)));
     }
 
-    // layout params
-    const layerX = {
-      left: -320, // layer -1 (uids + operators)
-      center: 0, // layer -2 (persons)
-      right: 320, // layer 3 (others)
-    };
-    const spacingY = 80;
-
-    // build positioned node map while skipping removed nodes
-    const positioned = new Map();
-
-
-const filteredOps = ops.filter((n) => !removedNodeIds.has(n.id));
-filteredOps.forEach((node, idx) => {
-  // Check if the node has an "Operator" label
-  const isOperator = node.labels.includes("Operator");
-  const iconDetails = labelIconMap.Operator;
-
-  const nodeProps = {
-    id: node.id,
-    label: node.id,
-    title: `ID: ${node.id}\nLabels: ${node.labels.join(", ")}`,
-    x: layerX.left,
-    y: idx * spacingY - ((filteredOps.length - 1) * spacingY) / 2,
-    value: 24,
-    group: "operator", // Still useful for styling or physics groups
-  };
-
-  if (isOperator && iconDetails) {
-    // If it is an operator, add the icon properties
-    nodeProps.shape = "icon";
-    nodeProps.icon = {
-      face: "FontAwesome",
-      code: iconDetails.code,
-      color: iconDetails.color,
-      size: 30, // Adjust size as needed
-    };
-  } else {
-    // Otherwise, use a default shape, for example
-    nodeProps.shape = "dot";
-  }
-
-  positioned.set(node.id, nodeProps);
-});
-
-
-// UIDs: place slightly right to operators but still in same left-layer band
-const filteredUids = uids.filter((n) => !removedNodeIds.has(n.id));
-filteredUids.forEach((node, idx) => {
-  const isUid = node.labels.includes("UID");
-  const iconDetails = labelIconMap.UID;
-
-  const nodeProps = {
-    id: node.id,
-    label: node.id,
-    title: `ID: ${node.id}\nLabels: ${node.labels.join(", ")}`,
-    x: layerX.left + 120,
-    y: idx * spacingY - ((filteredUids.length - 1) * spacingY) / 2,
-    value: 20,
-    group: "uid",
-  };
-
-  if (isUid && iconDetails) {
-    nodeProps.shape = "icon";
-    nodeProps.icon = {
-      face: "FontAwesome",
-      code: iconDetails.code,
-      color: iconDetails.color,
-      size: 30,
-    };
-  } else {
-    nodeProps.shape = "dot";
-  }
-
-  positioned.set(node.id, nodeProps);
-});
-
-// Persons: center column (do not remove persons)
-persons.forEach((node, idx) => {
-  const isPerson = node.labels.includes("Person");
-  const iconDetails = labelIconMap.Person;
-
-  const nodeProps = {
-    id: node.id,
-    label: node.id,
-    title: `ID: ${node.id}\nLabels: Refid`,
-    x: layerX.center,
-    y: idx * spacingY - ((persons.length - 1) * spacingY) / 2,
-    value: 22,
-    group: "person",
-  };
-
-  if (isPerson && iconDetails) {
-    nodeProps.shape = "icon";
-    nodeProps.icon = {
-      face: "FontAwesome",
-      code: iconDetails.code,
-      color: iconDetails.color,
-      size: 30,
-    };
-  } else {
-    nodeProps.shape = "dot";
-  }
-
-  positioned.set(node.id, nodeProps);
-});
-
-
-    // Others: right column (do not remove)
-    others.forEach((node, idx) => {
-      positioned.set(node.id, {
-        id: node.id,
-        label: node.id,
-        title: `ID: ${node.id}\nLabels: ${node.labels.join(", ")}`,
-        x: layerX.right,
-        y: idx * spacingY - ((others.length - 1) * spacingY) / 2,
+    // Build vis nodes
+    const visNodes = filteredNodes.map((node) => {
+      const labelKey =
+        node.labels.find((l) => labelColorMap[l]) ?? "default";
+      return {
+        id: String(node.node_id),
+        label: String(node.labels),
+        title: `ID: ${node.node_id}\nLabels: ${node.labels.join(", ")}`,
         shape: "dot",
-        value: 18,
-        group: "other",
-      });
+        color: {
+          background: labelColorMap[labelKey] || labelColorMap.default,
+          border: "#333",
+        },
+        value: 20,
+      };
     });
 
-    // create edges — skip edges touching removed nodes
-    const edgesArr = relationships
-      .filter((r) => {
-        const s = String(r.start);
-        const e = String(r.end);
-        if (removedNodeIds.has(s) || removedNodeIds.has(e)) return false;
-        return true;
-      })
+    // Build vis edges
+    const visEdges = relationships
+      .filter(
+        (r) =>
+          filteredNodes.some((n) => String(n.node_id) === String(r.start)) &&
+          filteredNodes.some((n) => String(n.node_id) === String(r.end))
+      )
       .map((r) => ({
         id: r.id,
         from: String(r.start),
@@ -284,111 +158,129 @@ persons.forEach((node, idx) => {
         title: r.type || "",
       }));
 
-    // preview counts
-    setPreviewCounts({ nodes: positioned.size, edges: edgesArr.length });
+    setPreviewCounts({ nodes: visNodes.length, edges: visEdges.length });
 
-    // create DataSets with positions applied
-    const nodesDS = new DataSet(Array.from(positioned.values()));
-    const edgesDS = new DataSet(edgesArr);
-    const data = { nodes: nodesDS, edges: edgesDS };
+    const data = { nodes: new DataSet(visNodes), edges: new DataSet(visEdges) };
 
     const options = {
       physics: {
-        enabled: true,
-        stabilization: { enabled: true, iterations: 500, updateInterval: 25 },
-        barnesHut: { gravitationalConstant: -2000, springLength: 150, springConstant: 0.04, avoidOverlap: 0.5 },
+        enabled: false,
+        barnesHut: {
+          gravitationalConstant: -2000,
+          springLength: 150,
+          springConstant: 0.04,
+          avoidOverlap: 0.5,
+        },
       },
-      nodes: { font: { multi: true }, scaling: { min: 8, max: 48 } },
-      edges: { smooth: { type: "continuous" }, color: { color: "#888", highlight: "#ff4500" } },
-      interaction: { hover: true, tooltipDelay: 100, navigationButtons: true, dragNodes: true },
-      groups: {
-        operator: { color: { background: "#ffd1a4", border: "#c06" } },
-        uid: { color: { background: "#cfe9ff", border: "#06c" } },
-        person: { color: { background: "#e6ffe6", border: "#0a0" } },
-        other: { color: { background: "#eee", border: "#777" } },
+      nodes: {
+        shape: "dot",
+        scaling: { min: 8, max: 48 },
+        font: { color: "#333" },
       },
+      edges: {
+        color: { color: "#888", highlight: "#ff4500" },
+        smooth: { type: "continuous" },
+        arrows: "to",
+      },
+      interaction: { hover: true, tooltipDelay: 100, navigationButtons: true },
     };
 
-    // destroy previous network if present
+    // Destroy previous network
     if (networkRef.current) {
       try {
         networkRef.current.destroy();
-      } catch (e) {
-        // ignore
-      }
+      } catch {}
       networkRef.current = null;
     }
 
+    // Create new vis network
     networkRef.current = new Network(containerRef.current, data, options);
 
-    // after stabilization, disable physics so nodes remain where placed
-    networkRef.current.once("stabilizationIterationsDone", () => {
-      try {
-        networkRef.current.setOptions({ physics: { enabled: false } });
-        networkRef.current.fit({ animation: { duration: 300 } });
-      } catch (e) {}
-    });
-
-    // selection handler: update info box
-    const onSelect = (params) => {
-      if (params.nodes && params.nodes.length) {
+    // Selection and interactions
+    networkRef.current.on("select", (params) => {
+      if (params.nodes?.length) {
         const nid = params.nodes[0];
-        const n = nodesDS.get(nid);
-        setSelectedNode({ id: nid, labels: (n.group ? (n.group=='person'?['Refid']:[n.group]) : []) });
+        const node = data.nodes.get(nid);
+        setSelectedNode({
+          id: nid,
+          labels: node
+            ? node.title.match(/Labels: (.*)/)?.[1]?.split(", ")
+            : [],
+        });
       } else {
         setSelectedNode(null);
       }
-    };
+    });
 
-    // drag end: positions are updated automatically in vis DS; nothing to fix
-    const onDragEnd = (/*params*/) => {};
-
-    // double click background to re-enable physics briefly for re-layout
-    const onDoubleClick = (params) => {
-      if (!params.nodes || params.nodes.length === 0) {
+    networkRef.current.on("doubleClick", (params) => {
+      if (!params.nodes?.length) {
         networkRef.current.setOptions({ physics: { enabled: true } });
         networkRef.current.once("stabilizationIterationsDone", () => {
-          try {
-            networkRef.current.setOptions({ physics: { enabled: false } });
-          } catch (e) {}
+          networkRef.current.setOptions({ physics: { enabled: false } });
         });
       }
-    };
-
-    networkRef.current.on("select", onSelect);
-    networkRef.current.on("dragEnd", onDragEnd);
-    networkRef.current.on("doubleClick", onDoubleClick);
+    });
 
     return () => {
       if (networkRef.current) {
         try {
-          networkRef.current.off("select", onSelect);
-          networkRef.current.off("dragEnd", onDragEnd);
-          networkRef.current.off("doubleClick", onDoubleClick);
           networkRef.current.destroy();
-        } catch (e) {}
+        } catch {}
         networkRef.current = null;
       }
     };
   }, [nodes, relationships, magicFilter]);
 
-  // UI handlers
   const handleSubmit = async (e) => {
     e?.preventDefault();
     await fetchGraph(refid.trim());
   };
+
   const onKeyDown = (e) => {
     if (e.key === "Enter") handleSubmit(e);
   };
 
-  // styles
-  const toolbarStyle = { display: "flex", gap: 8, marginBottom: 12, alignItems: "center", padding: 8, borderRadius: 8 };
-  const inputStyle = { padding: "8px 10px", borderRadius: 6, border: "1px solid #e0e0e0", width: 380, fontSize: 14 };
-  const btnPrimary = { padding: "8px 12px", borderRadius: 6, border: "none", cursor: "pointer", background: "#1976d2", color: "#fff" };
-  const btnMagic = { padding: "8px 12px", borderRadius: 6, border: "none", cursor: "pointer", background: magicFilter ? "#ffa726" : "#ddd", color: magicFilter ? "#fff" : "#222" };
-  const infoStyle = { marginLeft: "auto", color: error ? "#b00020" : "#666", fontSize: 13 };
+  const toggleId = () => {
+    setcurrId((prev) => (prev === "refid" ? "communityid" : "refid"));
+  };
 
-  // top-right selection box
+  // Styles
+  const toolbarStyle = {
+    display: "flex",
+    gap: 8,
+    marginBottom: 12,
+    alignItems: "center",
+    padding: 8,
+    borderRadius: 8,
+  };
+  const inputStyle = {
+    padding: "8px 10px",
+    borderRadius: 6,
+    border: "1px solid #e0e0e0",
+    width: 380,
+    fontSize: 14,
+  };
+  const btnPrimary = {
+    padding: "8px 12px",
+    borderRadius: 6,
+    border: "none",
+    cursor: "pointer",
+    background: "#1976d2",
+    color: "#fff",
+  };
+  const btnMagic = {
+    padding: "8px 12px",
+    borderRadius: 6,
+    border: "none",
+    cursor: "pointer",
+    background: magicFilter ? "#ffa726" : "#ddd",
+    color: magicFilter ? "#fff" : "#222",
+  };
+  const infoStyle = {
+    marginLeft: "auto",
+    color: error ? "#b00020" : "#666",
+    fontSize: 13,
+  };
   const selectionBox = {
     position: "absolute",
     right: 12,
@@ -407,37 +299,46 @@ persons.forEach((node, idx) => {
       <div style={toolbarStyle}>
         <div style={{ fontWeight: 700, fontSize: 16 }}>Refid graph</div>
         <input
-          placeholder="Enter person/refid id"
+          placeholder="Enter Refid/refid id"
           value={refid}
           onChange={(e) => setRefid(e.target.value)}
           onKeyDown={onKeyDown}
           style={inputStyle}
         />
+        <button onClick={toggleId} style={btnPrimary}>
+          {currId}
+        </button>
         <button onClick={handleSubmit} disabled={loading} style={btnPrimary}>
           {loading ? "Loading…" : "Fetch"}
         </button>
-
-        {/* Magic filter button */}
         <button onClick={toggleMagic} style={btnMagic}>
-           Magic
+          Magic
         </button>
-
-        <div style={infoStyle}>{error ? error : `nodes: ${previewCounts.nodes} • edges: ${previewCounts.edges}`}</div>
+        <div style={infoStyle}>
+          {error
+            ? error
+            : `nodes: ${previewCounts.nodes} • edges: ${previewCounts.edges}`}
+        </div>
       </div>
 
-      {/* selection info box */}
+      {/* Selection box */}
       <div style={selectionBox}>
         <div style={{ fontWeight: 700, marginBottom: 6 }}>Selection</div>
         {selectedNode ? (
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{selectedNode.id}</div>
-            <div style={{ fontSize: 12, color: "#666" }}>{(selectedNode.labels || []).join(", ")}</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              {selectedNode.id}
+            </div>
+            <div style={{ fontSize: 12, color: "#666" }}>
+              {(selectedNode.labels || []).join(", ")}
+            </div>
           </div>
         ) : (
           <div style={{ color: "#666", fontSize: 13 }}>No node selected</div>
         )}
       </div>
 
+      {/* Network container */}
       <div
         ref={containerRef}
         style={{
