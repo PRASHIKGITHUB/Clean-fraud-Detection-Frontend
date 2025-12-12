@@ -1,4 +1,4 @@
-// src/components/DateEndpointChartClean.tsx
+// src/components/CommunityGraphs.tsx
 import React, { JSX, useMemo, useState } from "react";
 import {
   Chart as ChartJS,
@@ -27,14 +27,14 @@ ChartJS.register(
   Filler
 );
 
-export default function CommunityGraphs(): JSX.Element {
+export default function CommunityGraphs(selectedId: string): JSX.Element {
   const [endpoint, setEndpoint] = useState<string>("");
   const [rawDates, setRawDates] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const base = "http://localhost:8080/";
-
+  // setEndpoint(String(selectedId));
   async function fetchData() {
     setError(null);
     setRawDates(null);
@@ -107,7 +107,7 @@ export default function CommunityGraphs(): JSX.Element {
           type: "bar",
           label: "Daily Count",
           data: chartData.counts,
-          backgroundColor: "#111",
+          backgroundColor: "#252222ff",
           borderRadius: 4,
           yAxisID: "y",
         },
@@ -116,7 +116,7 @@ export default function CommunityGraphs(): JSX.Element {
           label: "Cumulative",
           data: chartData.cumulative,
           borderColor: "#ff0000",
-          pointBackgroundColor: "#fff",
+          pointBackgroundColor: "#ffffffff",
           yAxisID: "y",
           tension: 0.25,
           fill: false,
@@ -136,7 +136,7 @@ export default function CommunityGraphs(): JSX.Element {
     plugins: {
       title: {
         display: true,
-        text: "Refids vs Time (Only Actual Data Points)",
+        text: "Refid Count vs Time",
         color: "#111",
         font: { size: 20, weight: "bold" },
         padding: { top: 10, bottom: 20 },
@@ -169,7 +169,7 @@ export default function CommunityGraphs(): JSX.Element {
         grid: { color: "rgba(0,0,0,0.08)" },
         title: {
           display: true,
-          text: "Date (only dates with data)",
+          text: "Date ",
           color: "#333",
           font: { size: 13, weight: "500" },
         },
@@ -189,6 +189,7 @@ export default function CommunityGraphs(): JSX.Element {
     },
   };
 
+
   return (
     <div
       style={{
@@ -197,7 +198,7 @@ export default function CommunityGraphs(): JSX.Element {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <h2 style={{ marginBottom: 12 }}>Fetch Dates & Show Histogram + Cumulative</h2>
+      <h2 style={{ marginBottom: 12 }}>Community Graph</h2>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <input
@@ -205,6 +206,7 @@ export default function CommunityGraphs(): JSX.Element {
           placeholder="Enter community Id"
           value={endpoint}
           onChange={(e) => setEndpoint(e.target.value)}
+          onKeyDown={fetchData}
           style={{
             flex: 1,
             padding: "8px 10px",
@@ -258,7 +260,7 @@ export default function CommunityGraphs(): JSX.Element {
 
       {rawDates && (
         <div style={{ marginTop: 12, color: "#333", fontSize: 13 }}>
-          <strong>Last fetched:</strong> {rawDates.length} dates.
+          <strong>Last fetched:</strong> {rawDates.length} Refids.
         </div>
       )}
     </div>

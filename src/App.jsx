@@ -37,12 +37,12 @@ export default function App() {
 
         <div className="flex gap-2">
 
-          <button
+          {/* <button
             onClick={() => setActivePanel("commGraph")}
             className={`px-2 py-1 rounded-md text-sm transition ${activePanel === "commGraph" ? "bg-black text-white" : "bg-white border border-gray-200"}`}
           >
             Community Graph
-          </button>
+          </button> */}
 
           <button
             onClick={() => setActivePanel("force")}
@@ -95,11 +95,11 @@ export default function App() {
           </div>
         )}
 
-        {activePanel === "commGraph" && (
+        {/* {activePanel === "commGraph" && (
           <div>
-            <CommunityGraphs/>
+            <CommunityGraphs selectedId=""/>
           </div>
-        )}
+        )} */}
 
         {activePanel === "sus" && (
           <div>

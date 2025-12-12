@@ -1,4 +1,6 @@
+//Rendercomm.jsx
 import React, { useState, useRef, useMemo } from "react";
+import CommunityGraphs from "./communityGraphs";
 
 const container = { maxWidth: 980, margin: "20px auto", fontFamily: "Inter, Roboto, system-ui, sans-serif" };
 const btn = { padding: "8px 12px", borderRadius: 8, border: "none", cursor: "pointer", background: "#1976d2", color: "#fff" };
@@ -30,6 +32,8 @@ export default function RenderComm({ base, endpoint, data, setData }) {
   const [page, setPage] = useState(1);
   const pageSize = 10; //  number of rows per page
 
+  const [showCommModal, setShowCommModal] = useState(false);
+  const [selectedCommId, setSelectedCommId] = useState("");
 
   const showToast = (msg, ms = 2500) => {
     setToastMsg(msg);
@@ -64,8 +68,10 @@ export default function RenderComm({ base, endpoint, data, setData }) {
 
   const copyToClipboard = async (text) => {
     try {
+      setSelectedCommId(text);
       await navigator.clipboard.writeText(text);
       showToast(`Copied: ${text}`);
+      setShowCommModal(true);
     } catch (e) {
       showToast("Copy failed");
     }
@@ -83,6 +89,22 @@ export default function RenderComm({ base, endpoint, data, setData }) {
 
   return (
     <div style={container}>
+        {showCommModal && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="bg-white p-4 rounded-lg w-[90%] max-w-3xl shadow-lg relative">
+
+      <button
+        onClick={() => setShowCommModal(false)}
+        className="absolute right-3 top-3 text-black border px-2 rounded"
+      >
+        ✕
+      </button>
+
+        <CommunityGraphs selectedId={selectedCommId} />
+        </div>
+    </div>
+    )}
+
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ marginBottom: 4 }}>Community Finder</h2>
         <div style={{ color: "#666", fontSize: 13 }}>
@@ -137,7 +159,7 @@ export default function RenderComm({ base, endpoint, data, setData }) {
                     <td style={td}>{row.percentControlled}</td>
                     <td style={td}>
                       <button onClick={() => copyToClipboard(row.communityId)} style={btnGhost}>
-                        Copy ID
+                        Load Graph
                       </button>
                     </td>
                   </tr>
